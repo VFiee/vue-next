@@ -74,6 +74,7 @@ function createConfig(format, output, plugins = []) {
   }
 
   output.externalLiveBindings = false
+  output.sourcemap = true;
 
   const isProductionBuild =
     process.env.__DEV__ === 'false' || /\.prod\.js$/.test(output.file)
@@ -128,7 +129,7 @@ function createConfig(format, output, plugins = []) {
         isProductionBuild,
         isBundlerESMBuild,
         (isGlobalBuild || isRawESMBuild || isBundlerESMBuild) &&
-          !packageOptions.enableNonBrowserBranches,
+        !packageOptions.enableNonBrowserBranches,
         isRuntimeCompileBuild
       ),
       ...plugins
@@ -153,9 +154,9 @@ function createReplacePlugin(
     __VERSION__: `"${masterVersion}"`,
     __DEV__: isBundlerESMBuild
       ? // preserve to be handled by bundlers
-        `(process.env.NODE_ENV !== 'production')`
+      `(process.env.NODE_ENV !== 'production')`
       : // hard coded dev/prod builds
-        !isProduction,
+      !isProduction,
     // this is only used during tests
     __TEST__: isBundlerESMBuild ? `(process.env.NODE_ENV === 'test')` : false,
     // If the build is expected to run directly in the browser (global / esm builds)

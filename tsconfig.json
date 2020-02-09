@@ -2,7 +2,7 @@
   "compilerOptions": {
     "baseUrl": ".",
     "outDir": "dist",
-    "sourceMap": false,
+    "sourceMap": true,
     "target": "esnext",
     "module": "esnext",
     "moduleResolution": "node",
@@ -16,11 +16,20 @@
     "esModuleInterop": true,
     "removeComments": false,
     "jsx": "preserve",
-    "lib": ["esnext", "dom"],
-    "types": ["jest", "puppeteer", "node"],
+    "lib": [
+      "esnext",
+      "dom"
+    ],
+    "types": [
+      "jest",
+      "puppeteer",
+      "node"
+    ],
     "rootDir": ".",
     "paths": {
-      "@vue/*": ["packages/*/src"]
+      "@vue/*": [
+        "packages/*/src"
+      ]
     }
   },
   "include": [
