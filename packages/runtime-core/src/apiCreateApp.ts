@@ -1,4 +1,9 @@
-import { Component, Data, validateComponentName } from './component'
+import {
+  Component,
+  Data,
+  validateComponentName,
+  PublicAPIComponent
+} from './component'
 import { ComponentOptions } from './apiOptions'
 import { ComponentPublicInstance } from './componentProxy'
 import { Directive, validateDirectiveName } from './directives'
@@ -6,7 +11,7 @@ import { RootRenderFunction } from './renderer'
 import { InjectionKey } from './apiInject'
 import { isFunction, NO, isObject } from '@vue/shared'
 import { warn } from './warning'
-import { createVNode, cloneVNode } from './vnode'
+import { createVNode, cloneVNode, VNode } from './vnode'
 
 export interface App<HostElement = any> {
   config: AppConfig
@@ -17,15 +22,17 @@ export interface App<HostElement = any> {
   directive(name: string): Directive | undefined
   directive(name: string, directive: Directive): this
   mount(
-    rootComponent:
-      | Component
-      // for compatibility with defineComponent() return types
-      | { new (): ComponentPublicInstance<any, any, any, any, any> },
     rootContainer: HostElement | string,
-    rootProps?: Data
+    isHydrate?: boolean
   ): ComponentPublicInstance
   unmount(rootContainer: HostElement | string): void
   provide<T>(key: InjectionKey<T> | string, value: T): this
+
+  // internal. We need to expose these for the server-renderer
+  _component: Component
+  _props: Data | null
+  _container: HostElement | null
+  _context: AppContext
 }
 
 export interface AppConfig {
@@ -75,20 +82,36 @@ export function createAppContext(): AppContext {
     mixins: [],
     components: {},
     directives: {},
-    provides: {}
+    provides: Object.create(null)
   }
 }
 
+export type CreateAppFunction<HostElement> = (
+  rootComponent: PublicAPIComponent,
+  rootProps?: Data | null
+) => App<HostElement>
+
 export function createAppAPI<HostNode, HostElement>(
-  render: RootRenderFunction<HostNode, HostElement>
-): () => App<HostElement> {
-  return function createApp(): App {
+  render: RootRenderFunction<HostNode, HostElement>,
+  hydrate?: (vnode: VNode, container: Element) => void
+): CreateAppFunction<HostElement> {
+  return function createApp(rootComponent: Component, rootProps = null) {
+    if (rootProps != null && !isObject(rootProps)) {
+      __DEV__ && warn(`root props passed to app.mount() must be an object.`)
+      rootProps = null
+    }
+
     const context = createAppContext()
     const installedPlugins = new Set()
 
     let isMounted = false
 
     const app: App = {
+      _component: rootComponent,
+      _props: rootProps,
+      _container: null,
+      _context: context,
+
       get config() {
         return context.config
       },
@@ -120,23 +143,22 @@ export function createAppAPI<HostNode, HostElement>(
       },
 
       mixin(mixin: ComponentOptions) {
-        if (__DEV__ && !__FEATURE_OPTIONS__) {
+        if (__FEATURE_OPTIONS__) {
+          if (!context.mixins.includes(mixin)) {
+            context.mixins.push(mixin)
+          } else if (__DEV__) {
+            warn(
+              'Mixin has already been applied to target app' +
+                (mixin.name ? `: ${mixin.name}` : '')
+            )
+          }
+        } else if (__DEV__) {
           warn('Mixins are only available in builds supporting Options API')
         }
-
-        if (!context.mixins.includes(mixin)) {
-          context.mixins.push(mixin)
-        } else if (__DEV__) {
-          warn(
-            'Mixin has already been applied to target app' +
-              (mixin.name ? `: ${mixin.name}` : '')
-          )
-        }
-
         return app
       },
 
-      component(name: string, component?: Component): any {
+      component(name: string, component?: PublicAPIComponent): any {
         if (__DEV__) {
           validateComponentName(name, context.config)
         }
@@ -146,7 +168,7 @@ export function createAppAPI<HostNode, HostElement>(
         if (__DEV__ && context.components[name]) {
           warn(`Component "${name}" has already been registered in target app.`)
         }
-        context.components[name] = component
+        context.components[name] = component as Component
         return app
       },
 
@@ -165,17 +187,8 @@ export function createAppAPI<HostNode, HostElement>(
         return app
       },
 
-      mount(
-        rootComponent: Component,
-        rootContainer: HostElement,
-        rootProps?: Data | null
-      ): any {
+      mount(rootContainer: HostElement, isHydrate?: boolean): any {
         if (!isMounted) {
-          if (rootProps != null && !isObject(rootProps)) {
-            __DEV__ &&
-              warn(`root props passed to app.mount() must be an object.`)
-            rootProps = null
-          }
           const vnode = createVNode(rootComponent, rootProps)
           // store app context on the root VNode.
           // this will be set on the root instance on initial mount.
@@ -188,8 +201,13 @@ export function createAppAPI<HostNode, HostElement>(
             }
           }
 
-          render(vnode, rootContainer)
+          if (isHydrate && hydrate) {
+            hydrate(vnode, rootContainer as any)
+          } else {
+            render(vnode, rootContainer)
+          }
           isMounted = true
+          app._container = rootContainer
           return vnode.component!.proxy
         } else if (__DEV__) {
           warn(
@@ -198,8 +216,12 @@ export function createAppAPI<HostNode, HostElement>(
         }
       },
 
-      unmount(rootContainer: HostElement) {
-        render(null, rootContainer)
+      unmount() {
+        if (isMounted) {
+          render(null, app._container)
+        } else if (__DEV__) {
+          warn(`Cannot unmount an app that is not mounted.`)
+        }
       },
 
       provide(key, value) {

@@ -16,9 +16,13 @@ export function defaultOnError(error: CompilerError) {
 export function createCompilerError<T extends number>(
   code: T,
   loc?: SourceLocation,
-  messages?: { [code: number]: string }
+  messages?: { [code: number]: string },
+  additionalMessage?: string
 ): T extends ErrorCodes ? CoreCompilerError : CompilerError {
-  const msg = __DEV__ || !__BROWSER__ ? (messages || errorMessages)[code] : code
+  const msg =
+    __DEV__ || !__BROWSER__
+      ? (messages || errorMessages)[code] + (additionalMessage || ``)
+      : code
   const error = new SyntaxError(String(msg)) as CompilerError
   error.code = code
   error.loc = loc
@@ -57,7 +61,6 @@ export const enum ErrorCodes {
   UNEXPECTED_NULL_CHARACTER,
   UNEXPECTED_QUESTION_MARK_INSTEAD_OF_TAG_NAME,
   UNEXPECTED_SOLIDUS_IN_TAG,
-  UNKNOWN_NAMED_CHARACTER_REFERENCE,
 
   // Vue-specific parse errors
   X_INVALID_END_TAG,
@@ -82,6 +85,7 @@ export const enum ErrorCodes {
   X_V_MODEL_MALFORMED_EXPRESSION,
   X_V_MODEL_ON_SCOPE_VARIABLE,
   X_INVALID_EXPRESSION,
+  X_KEEP_ALIVE_INVALID_CHILDREN,
 
   // generic errors
   X_PREFIX_ID_NOT_SUPPORTED,
@@ -141,7 +145,6 @@ export const errorMessages: { [code: number]: string } = {
   [ErrorCodes.UNEXPECTED_QUESTION_MARK_INSTEAD_OF_TAG_NAME]:
     "'<?' is allowed only in XML context.",
   [ErrorCodes.UNEXPECTED_SOLIDUS_IN_TAG]: "Illegal '/' in tags.",
-  [ErrorCodes.UNKNOWN_NAMED_CHARACTER_REFERENCE]: 'Unknown entity name.',
 
   // Vue-specific parse errors
   [ErrorCodes.X_INVALID_END_TAG]: 'Invalid end tag.',
@@ -175,7 +178,8 @@ export const errorMessages: { [code: number]: string } = {
   [ErrorCodes.X_V_MODEL_NO_EXPRESSION]: `v-model is missing expression.`,
   [ErrorCodes.X_V_MODEL_MALFORMED_EXPRESSION]: `v-model value must be a valid JavaScript member expression.`,
   [ErrorCodes.X_V_MODEL_ON_SCOPE_VARIABLE]: `v-model cannot be used on v-for or v-slot scope variables because they are not writable.`,
-  [ErrorCodes.X_INVALID_EXPRESSION]: `Invalid JavaScript expression.`,
+  [ErrorCodes.X_INVALID_EXPRESSION]: `Error parsing JavaScript expression: `,
+  [ErrorCodes.X_KEEP_ALIVE_INVALID_CHILDREN]: `<KeepAlive> expects exactly one child component.`,
 
   // generic errors
   [ErrorCodes.X_PREFIX_ID_NOT_SUPPORTED]: `"prefixIdentifiers" option is not supported in this build of compiler.`,

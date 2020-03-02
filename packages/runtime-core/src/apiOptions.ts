@@ -1,10 +1,10 @@
 import {
   ComponentInternalInstance,
   Data,
-  Component,
   SetupContext,
   RenderFunction,
-  SFCInternalOptions
+  SFCInternalOptions,
+  PublicAPIComponent
 } from './component'
 import {
   isFunction,
@@ -15,7 +15,7 @@ import {
   EMPTY_OBJ,
   NOOP
 } from '@vue/shared'
-import { computed } from './apiReactivity'
+import { computed } from './apiComputed'
 import { watch, WatchOptions, WatchCallback } from './apiWatch'
 import { provide, inject } from './apiInject'
 import {
@@ -63,10 +63,14 @@ export interface ComponentOptionsBase<
   // Luckily `render()` doesn't need any arguments nor does it care about return
   // type.
   render?: Function
-  components?: Record<
-    string,
-    Component | { new (): ComponentPublicInstance<any, any, any, any, any> }
-  >
+  // SSR only. This is produced by compiler-ssr and attached in compiler-sfc
+  // not user facing, so the typing is lax and for test only.
+  ssrRender?: (
+    ctx: any,
+    push: (item: any) => void,
+    parentInstance: ComponentInternalInstance
+  ) => void
+  components?: Record<string, PublicAPIComponent>
   directives?: Record<string, Directive>
   inheritAttrs?: boolean
 
@@ -214,10 +218,6 @@ export function applyOptions(
   options: ComponentOptions,
   asMixin: boolean = false
 ) {
-  const renderContext =
-    instance.renderContext === EMPTY_OBJ
-      ? (instance.renderContext = reactive({}))
-      : instance.renderContext
   const ctx = instance.proxy!
   const {
     // composition
@@ -247,6 +247,12 @@ export function applyOptions(
     renderTriggered,
     errorCaptured
   } = options
+
+  const renderContext =
+    instance.renderContext === EMPTY_OBJ &&
+    (computedOptions || methods || watchOptions || injectOptions)
+      ? (instance.renderContext = reactive({}))
+      : instance.renderContext
 
   const globalMixins = instance.appContext.mixins
   // call it only during dev
@@ -289,6 +295,7 @@ export function applyOptions(
       extend(instance.data, data)
     }
   }
+
   if (computedOptions) {
     for (const key in computedOptions) {
       const opt = (computedOptions as ComputedOptions)[key]
@@ -296,12 +303,12 @@ export function applyOptions(
       __DEV__ && checkDuplicateProperties!(OptionTypes.COMPUTED, key)
 
       if (isFunction(opt)) {
-        renderContext[key] = computed(opt.bind(ctx))
+        renderContext[key] = computed(opt.bind(ctx, ctx))
       } else {
         const { get, set } = opt
         if (isFunction(get)) {
           renderContext[key] = computed({
-            get: get.bind(ctx),
+            get: get.bind(ctx, ctx),
             set: isFunction(set)
               ? set.bind(ctx)
               : __DEV__
@@ -333,11 +340,13 @@ export function applyOptions(
       }
     }
   }
+
   if (watchOptions) {
     for (const key in watchOptions) {
       createWatcher(watchOptions[key], renderContext, ctx, key)
     }
   }
+
   if (provideOptions) {
     const provides = isFunction(provideOptions)
       ? provideOptions.call(ctx)
@@ -346,6 +355,7 @@ export function applyOptions(
       provide(key, provides[key])
     }
   }
+
   if (injectOptions) {
     if (isArray(injectOptions)) {
       for (let i = 0; i < injectOptions.length; i++) {
