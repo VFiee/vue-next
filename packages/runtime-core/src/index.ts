@@ -74,7 +74,8 @@ export { warn } from './warning'
 export {
   handleError,
   callWithErrorHandling,
-  callWithAsyncErrorHandling
+  callWithAsyncErrorHandling,
+  ErrorCodes
 } from './errorHandling'
 export {
   useTransitionState,
@@ -84,6 +85,7 @@ export {
 
 // For compiler generated code
 // should sync with '@vue/compiler-core/src/runtimeConstants.ts'
+export { withCtx } from './helpers/withRenderContext'
 export { withDirectives } from './directives'
 export {
   resolveComponent,
@@ -114,6 +116,7 @@ import {
   setCurrentRenderingInstance
 } from './componentRenderUtils'
 import { isVNode, normalizeVNode } from './vnode'
+import { normalizeSuspenseChildren } from './components/Suspense'
 
 // SSR utils are only exposed in cjs builds.
 const _ssrUtils = {
@@ -122,7 +125,8 @@ const _ssrUtils = {
   renderComponentRoot,
   setCurrentRenderingInstance,
   isVNode,
-  normalizeVNode
+  normalizeVNode,
+  normalizeSuspenseChildren
 }
 
 export const ssrUtils = (__NODE_JS__ ? _ssrUtils : null) as typeof _ssrUtils

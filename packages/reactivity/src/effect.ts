@@ -46,7 +46,7 @@ export let activeEffect: ReactiveEffect | undefined
 export const ITERATE_KEY = Symbol('iterate')
 
 export function isEffect(fn: any): fn is ReactiveEffect {
-  return fn != null && fn._isEffect === true
+  return fn && fn._isEffect === true
 }
 
 export function effect<T = any>(
@@ -196,7 +196,7 @@ export function trigger(
     // also run for iteration key on ADD | DELETE | Map.SET
     if (
       type === TriggerOpTypes.ADD ||
-      type === TriggerOpTypes.DELETE ||
+      (type === TriggerOpTypes.DELETE && !isArray(target)) ||
       (type === TriggerOpTypes.SET && target instanceof Map)
     ) {
       const iterationKey = isArray(target) ? 'length' : ITERATE_KEY
@@ -231,7 +231,7 @@ function addRunners(
 ) {
   if (effectsToAdd !== void 0) {
     effectsToAdd.forEach(effect => {
-      if (effect !== activeEffect) {
+      if (effect !== activeEffect || !shouldTrack) {
         if (effect.options.computed) {
           computedRunners.add(effect)
         } else {

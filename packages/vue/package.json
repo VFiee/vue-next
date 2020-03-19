@@ -1,6 +1,6 @@
 {
   "name": "vue",
-  "version": "3.0.0-alpha.7",
+  "version": "3.0.0-alpha.9",
   "description": "vue",
   "main": "index.js",
   "module": "dist/vue.runtime.esm-bundler.js",
@@ -13,7 +13,6 @@
   ],
   "buildOptions": {
     "name": "Vue",
-    "isRuntimeCompileBuild": true,
     "formats": [
       "esm-bundler",
       "esm-bundler-runtime",
@@ -36,9 +35,9 @@
   },
   "homepage": "https://github.com/vuejs/vue-next/tree/master/packages/vue#readme",
   "dependencies": {
-    "@vue/shared": "3.0.0-alpha.7",
-    "@vue/compiler-dom": "3.0.0-alpha.7",
-    "@vue/runtime-dom": "3.0.0-alpha.7"
+    "@vue/shared": "3.0.0-alpha.9",
+    "@vue/compiler-dom": "3.0.0-alpha.9",
+    "@vue/runtime-dom": "3.0.0-alpha.9"
   },
   "devDependencies": {
     "lodash": "^4.17.15",
