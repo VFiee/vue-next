@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="./dist/reactivity.global.js"></script>
+    <title>Reactivity</title>
+</head>
+
+<body>
+    <script>
+        const { readonly, reactive, effect, computed, ref } = VueReactivity;
+        const obj = { n: 1, s: 'string', nl: null, u: undefined, f: function aaa() { }, s: Symbol() };
+        let observedObj = reactive(obj);
+        const handlerCountAdd = () => {
+            observedObj.n++;
+        }
+        effect(() => {
+            console.log('effect', observedObj.n);
+        });
+        handlerCountAdd();
+    </script>
+</body>
+
+</html>

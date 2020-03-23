@@ -103,7 +103,7 @@ function toProxyRef<T extends object, K extends keyof T>(
 // RelativePath extends object -> true
 type BaseTypes = string | number | boolean
 
-// Recursively unwraps nested value bindings.
+// Recursively unwraps nested value bindings.(递归拆开包裹的值绑定)
 export type UnwrapRef<T> = {
   cRef: T extends ComputedRef<infer V> ? UnwrapRef<V> : T
   ref: T extends Ref<infer V> ? UnwrapRef<V> : T

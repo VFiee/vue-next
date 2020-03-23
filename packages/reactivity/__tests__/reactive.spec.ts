@@ -11,7 +11,7 @@ import { computed } from '../src/computed'
 
 describe('reactivity/reactive', () => {
   mockWarn()
-
+  // 响应式对象
   test('Object', () => {
     const original = { foo: 1 }
     const observed = reactive(original)
@@ -25,7 +25,7 @@ describe('reactivity/reactive', () => {
     // ownKeys
     expect(Object.keys(observed)).toEqual(['foo'])
   })
-
+  // 嵌套的响应式
   test('nested reactives', () => {
     const original = {
       nested: {
@@ -38,7 +38,7 @@ describe('reactivity/reactive', () => {
     expect(isReactive(observed.array)).toBe(true)
     expect(isReactive(observed.array[0])).toBe(true)
   })
-
+  // 响应式的值的改变会应用到原生对象
   test('observed value should proxy mutations to original (Object)', () => {
     const original: any = { foo: 1 }
     const observed = reactive(original)
@@ -51,7 +51,7 @@ describe('reactivity/reactive', () => {
     expect('foo' in observed).toBe(false)
     expect('foo' in original).toBe(false)
   })
-
+  // 设置具有不可观察值的属性时，会使用反应式包装
   test('setting a property with an unobserved value should wrap with reactive', () => {
     const observed = reactive<{ foo?: object }>({})
     const raw = {}
@@ -59,21 +59,21 @@ describe('reactivity/reactive', () => {
     expect(observed.foo).not.toBe(raw)
     expect(isReactive(observed.foo)).toBe(true)
   })
-
+  // 观察响应式对象会返回相同的代理对象
   test('observing already observed value should return same Proxy', () => {
     const original = { foo: 1 }
     const observed = reactive(original)
     const observed2 = reactive(observed)
     expect(observed2).toBe(observed)
   })
-
+  // 多次观察相同的值会返回相同的代理对象
   test('observing the same value multiple times should return same Proxy', () => {
     const original = { foo: 1 }
     const observed = reactive(original)
     const observed2 = reactive(original)
     expect(observed2).toBe(observed)
   })
-
+  // 不应使用代理污染原始对象
   test('should not pollute original object with Proxies', () => {
     const original: any = { foo: 1 }
     const original2 = { bar: 2 }
@@ -83,14 +83,14 @@ describe('reactivity/reactive', () => {
     expect(observed.bar).toBe(observed2)
     expect(original.bar).toBe(original2)
   })
-
+  // 响应式对象和原始对象的相互转换
   test('unwrap', () => {
     const original = { foo: 1 }
     const observed = reactive(original)
     expect(toRaw(observed)).toBe(original)
     expect(toRaw(original)).toBe(original)
   })
-
+  // 不应该解开Ref<T>
   test('should not unwrap Ref<T>', () => {
     const observedNumberRef = reactive(ref(1))
     const observedObjectRef = reactive(ref({ foo: 1 }))
@@ -98,7 +98,7 @@ describe('reactivity/reactive', () => {
     expect(isRef(observedNumberRef)).toBe(true)
     expect(isRef(observedObjectRef)).toBe(true)
   })
-
+  // 应该解开计算属性的引用
   test('should unwrap computed refs', () => {
     // readonly
     const a = computed(() => 1)
@@ -114,7 +114,7 @@ describe('reactivity/reactive', () => {
     expect(typeof obj.a).toBe(`number`)
     expect(typeof obj.b).toBe(`number`)
   })
-
+  // 不可被观测的值(number,string,boolean,null,undefined,symbol)
   test('non-observable values', () => {
     const assertValue = (value: any) => {
       reactive(value)
@@ -145,7 +145,7 @@ describe('reactivity/reactive', () => {
     const d = new Date()
     expect(reactive(d)).toBe(d)
   })
-
+  // 标记为非响应式
   test('markNonReactive', () => {
     const obj = reactive({
       foo: { a: 1 },
@@ -154,13 +154,14 @@ describe('reactivity/reactive', () => {
     expect(isReactive(obj.foo)).toBe(true)
     expect(isReactive(obj.bar)).toBe(false)
   })
-
+  // 浅响应
   describe('shallowReactive', () => {
+    // 不应使非响应式响应
     test('should not make non-reactive properties reactive', () => {
       const props = shallowReactive({ n: { foo: 1 } })
       expect(isReactive(props.n)).toBe(false)
     })
-
+    // 应保持响应性
     test('should keep reactive properties reactive', () => {
       const props: any = shallowReactive({ n: reactive({ foo: 1 }) })
       props.n = reactive({ foo: 2 })

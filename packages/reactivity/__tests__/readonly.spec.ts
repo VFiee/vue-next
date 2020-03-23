@@ -23,6 +23,7 @@ describe('reactivity/readonly', () => {
   mockWarn()
 
   describe('Object', () => {
+    // 被嵌套的也应该是只读的
     it('should make nested values readonly', () => {
       const original = { foo: 1, bar: { baz: 2 } }
       const observed = readonly(original)
@@ -42,7 +43,7 @@ describe('reactivity/readonly', () => {
       // ownKeys
       expect(Object.keys(observed)).toEqual(['foo', 'bar'])
     })
-
+    // 只读的不允许改变
     it('should not allow mutation', () => {
       const qux = Symbol('qux')
       const original = {
@@ -90,7 +91,7 @@ describe('reactivity/readonly', () => {
         `Delete operation on key "Symbol(qux)" failed: target is readonly.`
       ).toHaveBeenWarnedLast()
     })
-
+    // 未上锁时允许修改
     it('should allow mutation when unlocked', () => {
       const observed: any = readonly({ foo: 1, bar: { baz: 2 } })
       unlock()
@@ -105,7 +106,7 @@ describe('reactivity/readonly', () => {
       expect('baz' in observed.bar).toBe(false)
       expect(`target is readonly`).not.toHaveBeenWarned()
     })
-
+    // 上锁时不会触发效果
     it('should not trigger effects when locked', () => {
       const observed: any = readonly({ a: 1 })
       let dummy
@@ -118,7 +119,7 @@ describe('reactivity/readonly', () => {
       expect(dummy).toBe(1)
       expect(`target is readonly`).toHaveBeenWarned()
     })
-
+    // 未锁定是会触发效果
     it('should trigger effects when unlocked', () => {
       const observed: any = readonly({ a: 1 })
       let dummy
@@ -135,6 +136,7 @@ describe('reactivity/readonly', () => {
   })
 
   describe('Array', () => {
+    // 被包裹的也是只读的
     it('should make nested values readonly', () => {
       const original = [{ foo: 1 }]
       const observed = readonly(original)
@@ -154,7 +156,7 @@ describe('reactivity/readonly', () => {
       // ownKeys
       expect(Object.keys(observed)).toEqual(['0'])
     })
-
+    // 不允许改变
     it('should not allow mutation', () => {
       const observed: any = readonly([{ foo: 1 }])
       observed[0] = 1
@@ -182,7 +184,7 @@ describe('reactivity/readonly', () => {
       // push triggers two warnings on [1] and .length
       expect(`target is readonly.`).toHaveBeenWarnedTimes(5)
     })
-
+    // 未上锁时允许改变
     it('should allow mutation when unlocked', () => {
       const observed: any = readonly([{ foo: 1, bar: { baz: 2 } }])
       unlock()
@@ -198,7 +200,7 @@ describe('reactivity/readonly', () => {
       expect(observed[0].bar.baz).toBe(3)
       expect(`target is readonly`).not.toHaveBeenWarned()
     })
-
+    // 上锁时不应该触发效果
     it('should not trigger effects when locked', () => {
       const observed: any = readonly([{ a: 1 }])
       let dummy
@@ -215,7 +217,7 @@ describe('reactivity/readonly', () => {
       expect(dummy).toBe(1)
       expect(`target is readonly`).toHaveBeenWarnedTimes(2)
     })
-
+    // 未上锁时可以触发效果
     it('should trigger effects when unlocked', () => {
       const observed: any = readonly([{ a: 1 }])
       let dummy
@@ -244,6 +246,7 @@ describe('reactivity/readonly', () => {
   const maps = [Map, WeakMap]
   maps.forEach((Collection: any) => {
     describe(Collection.name, () => {
+      // Map或WeakMap包裹的对象也是只读的
       test('should make nested values readonly', () => {
         const key1 = {}
         const key2 = {}
@@ -259,7 +262,7 @@ describe('reactivity/readonly', () => {
         expect(isReactive(original.get(key1))).toBe(false)
         expect(isReadonly(original.get(key1))).toBe(false)
       })
-
+      // Map或WeakMap不允许改变和触发效果
       test('should not allow mutation & not trigger effect', () => {
         const map = readonly(new Collection())
         const key = {}
@@ -275,7 +278,7 @@ describe('reactivity/readonly', () => {
           `Set operation on key "${key}" failed: target is readonly.`
         ).toHaveBeenWarned()
       })
-
+      // 未上锁时,允许改变和触发效果
       test('should allow mutation & trigger effect when unlocked', () => {
         const map = readonly(new Collection())
         const isWeak = Collection === WeakMap
@@ -384,7 +387,7 @@ describe('reactivity/readonly', () => {
       }
     })
   })
-
+  // 在只读对象上调用响应式函数会返回只读对象
   test('calling reactive on an readonly should return readonly', () => {
     const a = readonly({})
     const b = reactive(a)
@@ -392,7 +395,7 @@ describe('reactivity/readonly', () => {
     // should point to same original
     expect(toRaw(a)).toBe(toRaw(b))
   })
-
+  // 在响应式数据上调用只读函数返回只读函数
   test('calling readonly on a reactive object should return readonly', () => {
     const a = reactive({})
     const b = readonly(a)
@@ -400,21 +403,21 @@ describe('reactivity/readonly', () => {
     // should point to same original
     expect(toRaw(a)).toBe(toRaw(b))
   })
-
+  // 观测已被观测的对象应该返回相同的代理
   test('observing already observed value should return same Proxy', () => {
     const original = { foo: 1 }
     const observed = readonly(original)
     const observed2 = readonly(observed)
     expect(observed2).toBe(observed)
   })
-
+  // 多次观测同一个对象返回相同的代理
   test('observing the same value multiple times should return same Proxy', () => {
     const original = { foo: 1 }
     const observed = readonly(original)
     const observed2 = readonly(original)
     expect(observed2).toBe(observed)
   })
-
+  // 标记为非响应式
   test('markNonReactive', () => {
     const obj = readonly({
       foo: { a: 1 },
@@ -423,7 +426,7 @@ describe('reactivity/readonly', () => {
     expect(isReactive(obj.foo)).toBe(true)
     expect(isReactive(obj.bar)).toBe(false)
   })
-
+  // 标记为只读
   test('markReadonly', () => {
     const obj = reactive({
       foo: { a: 1 },
@@ -434,7 +437,7 @@ describe('reactivity/readonly', () => {
     expect(isReadonly(obj.foo)).toBe(false)
     expect(isReadonly(obj.bar)).toBe(true)
   })
-
+  // ref引用应该是只读的
   test('should make ref readonly', () => {
     const n: any = readonly(ref(1))
     n.value = 2
@@ -443,13 +446,14 @@ describe('reactivity/readonly', () => {
       `Set operation on key "value" failed: target is readonly.`
     ).toHaveBeenWarned()
   })
-
+  // 浅只读
   describe('shallowReadonly', () => {
+    // 非响应式对象的属性应该是非响应式的
     test('should not make non-reactive properties reactive', () => {
       const props = shallowReadonly({ n: { foo: 1 } })
       expect(isReactive(props.n)).toBe(false)
     })
-
+    // 跟属性应该是只读的
     test('should make root level properties readonly', () => {
       const props = shallowReadonly({ n: 1 })
       // @ts-ignore
@@ -461,6 +465,7 @@ describe('reactivity/readonly', () => {
     })
 
     // to retain 2.x behavior.
+    // 被包裹的属性不应该是只读的
     test('should NOT make nested properties readonly', () => {
       const props = shallowReadonly({ n: { foo: 1 } })
       // @ts-ignore
