@@ -34,7 +34,7 @@ import { currentRenderingInstance } from './componentRenderUtils'
 
 export const Fragment = (Symbol(__DEV__ ? 'Fragment' : undefined) as any) as {
   __isFragment: true
-  new (): {
+  new(): {
     $props: VNodeProps
   }
 }
@@ -91,9 +91,9 @@ type VNodeChildAtom<HostNode, HostElement> =
 
 export interface VNodeArrayChildren<HostNode = any, HostElement = any>
   extends Array<
-      | VNodeArrayChildren<HostNode, HostElement>
-      | VNodeChildAtom<HostNode, HostElement>
-    > {}
+  | VNodeArrayChildren<HostNode, HostElement>
+  | VNodeChildAtom<HostNode, HostElement>
+  > { }
 
 export type VNodeChild<HostNode = any, HostElement = any> =
   | VNodeChildAtom<HostNode, HostElement>
@@ -123,7 +123,7 @@ export interface VNode<HostNode = any, HostElement = any> {
   anchor: HostNode | null // fragment anchor
   target: HostElement | null // portal target
 
-  // optimization only
+  // optimization only  优化
   shapeFlag: number
   patchFlag: number
   dynamicProps: string[] | null
@@ -407,7 +407,7 @@ export function normalizeChildren(vnode: VNode, children: unknown) {
   } else if (typeof children === 'object') {
     type = ShapeFlags.SLOTS_CHILDREN
     if (!(children as RawSlots)._) {
-      ;(children as RawSlots)._ctx = currentRenderingInstance
+      ; (children as RawSlots)._ctx = currentRenderingInstance
     }
   } else if (isFunction(children)) {
     children = { default: children, _ctx: currentRenderingInstance }

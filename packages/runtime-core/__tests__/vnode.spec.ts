@@ -168,7 +168,7 @@ describe('vnode', () => {
   test('type shapeFlag inference', () => {
     expect(createVNode('div').shapeFlag).toBe(ShapeFlags.ELEMENT)
     expect(createVNode({}).shapeFlag).toBe(ShapeFlags.STATEFUL_COMPONENT)
-    expect(createVNode(() => {}).shapeFlag).toBe(
+    expect(createVNode(() => { }).shapeFlag).toBe(
       ShapeFlags.FUNCTIONAL_COMPONENT
     )
     expect(createVNode(Text).shapeFlag).toBe(0)
@@ -227,9 +227,9 @@ describe('vnode', () => {
     })
 
     test('handlers', () => {
-      let clickHander1 = function() {}
-      let clickHander2 = function() {}
-      let focusHander2 = function() {}
+      let clickHander1 = function () { }
+      let clickHander2 = function () { }
+      let focusHander2 = function () { }
 
       let props1: Data = { onClick: clickHander1 }
       let props2: Data = { onClick: clickHander2, onFocus: focusHander2 }
@@ -256,20 +256,20 @@ describe('vnode', () => {
       const hoist = createVNode('div')
       let vnode1
       const vnode = (openBlock(),
-      createBlock('div', null, [
-        hoist,
-        (vnode1 = createVNode('div', null, 'text', PatchFlags.TEXT))
-      ]))
+        createBlock('div', null, [
+          hoist,
+          (vnode1 = createVNode('div', null, 'text', PatchFlags.TEXT))
+        ]))
       expect(vnode.dynamicChildren).toStrictEqual([vnode1])
     })
 
     test('should not track vnodes with only HYDRATE_EVENTS flag', () => {
       const hoist = createVNode('div')
       const vnode = (openBlock(),
-      createBlock('div', null, [
-        hoist,
-        createVNode('div', null, 'text', PatchFlags.HYDRATE_EVENTS)
-      ]))
+        createBlock('div', null, [
+          hoist,
+          createVNode('div', null, 'text', PatchFlags.HYDRATE_EVENTS)
+        ]))
       expect(vnode.dynamicChildren).toStrictEqual([])
     })
 
@@ -277,15 +277,15 @@ describe('vnode', () => {
       const hoist = createVNode('div')
       let vnode1, vnode2, vnode3
       const vnode = (openBlock(),
-      createBlock('div', null, [
-        hoist,
-        (vnode1 = createVNode('div', null, 'text', PatchFlags.TEXT)),
-        (vnode2 = (openBlock(),
         createBlock('div', null, [
           hoist,
-          (vnode3 = createVNode('div', null, 'text', PatchFlags.TEXT))
-        ])))
-      ]))
+          (vnode1 = createVNode('div', null, 'text', PatchFlags.TEXT)),
+          (vnode2 = (openBlock(),
+            createBlock('div', null, [
+              hoist,
+              (vnode3 = createVNode('div', null, 'text', PatchFlags.TEXT))
+            ])))
+        ]))
       expect(vnode.dynamicChildren).toStrictEqual([vnode1, vnode2])
       expect(vnode2.dynamicChildren).toStrictEqual([vnode3])
     })
@@ -294,10 +294,10 @@ describe('vnode', () => {
       const hoist = createVNode('div')
       let vnode1
       const vnode = (openBlock(),
-      createBlock('div', null, [
-        hoist,
-        (vnode1 = createVNode({}, null, 'text'))
-      ]))
+        createBlock('div', null, [
+          hoist,
+          (vnode1 = createVNode({}, null, 'text'))
+        ]))
       expect(vnode.dynamicChildren).toStrictEqual([vnode1])
     })
 
@@ -305,10 +305,10 @@ describe('vnode', () => {
       const hoist = createVNode('div')
       let vnode1
       const vnode = (openBlock(),
-      createBlock('div', null, [
-        hoist,
-        (vnode1 = createVNode(() => {}, null, 'text'))
-      ]))
+        createBlock('div', null, [
+          hoist,
+          (vnode1 = createVNode(() => { }, null, 'text'))
+        ]))
       expect(vnode.dynamicChildren).toStrictEqual([vnode1])
     })
 
@@ -316,10 +316,10 @@ describe('vnode', () => {
       const hoist = createVNode('div')
       let vnode1
       const vnode = (openBlock(),
-      createBlock('div', null, [
-        hoist,
-        (vnode1 = createVNode(() => {}, null, 'text'))
-      ]))
+        createBlock('div', null, [
+          hoist,
+          (vnode1 = createVNode(() => { }, null, 'text'))
+        ]))
       expect(vnode.dynamicChildren).toStrictEqual([vnode1])
     })
   })

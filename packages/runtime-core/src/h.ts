@@ -71,7 +71,7 @@ interface Constructor<P = any> {
   __isFragment?: never
   __isPortal?: never
   __isSuspense?: never
-  new (): { $props: P }
+  new(): { $props: P }
 }
 
 // The following is a series of overloads for providing props validation of

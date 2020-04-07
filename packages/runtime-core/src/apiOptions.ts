@@ -49,7 +49,7 @@ export interface ComponentOptionsBase<
   D,
   C extends ComputedOptions,
   M extends MethodOptions
-> extends LegacyOptions<Props, RawBindings, D, C, M>, SFCInternalOptions {
+  > extends LegacyOptions<Props, RawBindings, D, C, M>, SFCInternalOptions {
   setup?: (
     this: void,
     props: Props,
@@ -89,9 +89,9 @@ export type ComponentOptionsWithoutProps<
   D = {},
   C extends ComputedOptions = {},
   M extends MethodOptions = {}
-> = ComponentOptionsBase<Readonly<Props>, RawBindings, D, C, M> & {
-  props?: undefined
-} & ThisType<ComponentPublicInstance<{}, RawBindings, D, C, M, Readonly<Props>>>
+  > = ComponentOptionsBase<Readonly<Props>, RawBindings, D, C, M> & {
+    props?: undefined
+  } & ThisType<ComponentPublicInstance<{}, RawBindings, D, C, M, Readonly<Props>>>
 
 export type ComponentOptionsWithArrayProps<
   PropNames extends string = string,
@@ -100,9 +100,9 @@ export type ComponentOptionsWithArrayProps<
   C extends ComputedOptions = {},
   M extends MethodOptions = {},
   Props = Readonly<{ [key in PropNames]?: any }>
-> = ComponentOptionsBase<Props, RawBindings, D, C, M> & {
-  props: PropNames[]
-} & ThisType<ComponentPublicInstance<Props, RawBindings, D, C, M>>
+  > = ComponentOptionsBase<Props, RawBindings, D, C, M> & {
+    props: PropNames[]
+  } & ThisType<ComponentPublicInstance<Props, RawBindings, D, C, M>>
 
 export type ComponentOptionsWithObjectProps<
   PropsOptions = ComponentObjectPropsOptions,
@@ -111,9 +111,9 @@ export type ComponentOptionsWithObjectProps<
   C extends ComputedOptions = {},
   M extends MethodOptions = {},
   Props = Readonly<ExtractPropTypes<PropsOptions>>
-> = ComponentOptionsBase<Props, RawBindings, D, C, M> & {
-  props: PropsOptions
-} & ThisType<ComponentPublicInstance<Props, RawBindings, D, C, M>>
+  > = ComponentOptionsBase<Props, RawBindings, D, C, M> & {
+    props: PropsOptions
+  } & ThisType<ComponentPublicInstance<Props, RawBindings, D, C, M>>
 
 export type ComponentOptions =
   | ComponentOptionsWithoutProps
@@ -134,8 +134,8 @@ export interface MethodOptions {
 
 export type ExtractComputedReturns<T extends any> = {
   [key in keyof T]: T[key] extends { get: Function }
-    ? ReturnType<T[key]['get']>
-    : ReturnType<T[key]>
+  ? ReturnType<T[key]['get']>
+  : ReturnType<T[key]>
 }
 
 type WatchOptionItem =
@@ -150,9 +150,9 @@ type ComponentWatchOptions = Record<string, ComponentWatchOptionItem>
 type ComponentInjectOptions =
   | string[]
   | Record<
-      string | symbol,
-      string | symbol | { from: string | symbol; default?: unknown }
-    >
+    string | symbol,
+    string | symbol | { from: string | symbol; default?: unknown }
+  >
 
 export interface LegacyOptions<
   Props,
@@ -160,7 +160,7 @@ export interface LegacyOptions<
   D,
   C extends ComputedOptions,
   M extends MethodOptions
-> {
+  > {
   el?: any
 
   // state
@@ -250,7 +250,7 @@ export function applyOptions(
 
   const renderContext =
     instance.renderContext === EMPTY_OBJ &&
-    (computedOptions || methods || watchOptions || injectOptions)
+      (computedOptions || methods || watchOptions || injectOptions)
       ? (instance.renderContext = reactive({}))
       : instance.renderContext
 
@@ -283,7 +283,7 @@ export function applyOptions(
     if (__DEV__ && !isFunction(dataOptions)) {
       warn(
         `The data option must be a function. ` +
-          `Plain object usage is no longer supported.`
+        `Plain object usage is no longer supported.`
       )
     }
     const data = dataOptions.call(ctx, ctx)
@@ -319,10 +319,10 @@ export function applyOptions(
               ? set.bind(ctx)
               : __DEV__
                 ? () => {
-                    warn(
-                      `Computed property "${key}" was assigned to but it has no setter.`
-                    )
-                  }
+                  warn(
+                    `Computed property "${key}" was assigned to but it has no setter.`
+                  )
+                }
                 : NOOP
           })
         } else if (__DEV__) {
@@ -341,7 +341,7 @@ export function applyOptions(
       } else if (__DEV__) {
         warn(
           `Method "${key}" has type "${typeof methodHandler}" in the component definition. ` +
-            `Did you reference the function correctly?`
+          `Did you reference the function correctly?`
         )
       }
     }

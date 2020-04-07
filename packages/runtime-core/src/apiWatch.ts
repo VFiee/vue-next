@@ -50,8 +50,8 @@ type MapSources<T> = {
 
 type MapOldSources<T, Immediate> = {
   [K in keyof T]: T[K] extends WatchSource<infer V>
-    ? Immediate extends true ? (V | undefined) : V
-    : never
+  ? Immediate extends true ? (V | undefined) : V
+  : never
 }
 
 type InvalidateCbRegistrator = (cb: () => void) => void
@@ -111,8 +111,8 @@ export function watch<T = any>(
   if (__DEV__ && !isFunction(cb)) {
     warn(
       `\`watch(fn, options?)\` signature has been moved to a separate API. ` +
-        `Use \`watchEffect(fn, options?)\` instead. \`watch\` now only ` +
-        `supports \`watch(source, cb, options?) signature.`
+      `Use \`watchEffect(fn, options?)\` instead. \`watch\` now only ` +
+      `supports \`watch(source, cb, options?) signature.`
     )
   }
   return doWatch(source, cb, options)
@@ -127,13 +127,13 @@ function doWatch(
     if (immediate !== undefined) {
       warn(
         `watch() "immediate" option is only respected when using the ` +
-          `watch(source, callback, options?) signature.`
+        `watch(source, callback, options?) signature.`
       )
     }
     if (deep !== undefined) {
       warn(
         `watch() "deep" option is only respected when using the ` +
-          `watch(source, callback, options?) signature.`
+        `watch(source, callback, options?) signature.`
       )
     }
   }
@@ -204,24 +204,24 @@ function doWatch(
   let oldValue = isArray(source) ? [] : INITIAL_WATCHER_VALUE
   const applyCb = cb
     ? () => {
-        if (instance && instance.isUnmounted) {
-          return
-        }
-        const newValue = runner()
-        if (deep || hasChanged(newValue, oldValue)) {
-          // cleanup before running cb again
-          if (cleanup) {
-            cleanup()
-          }
-          callWithAsyncErrorHandling(cb, instance, ErrorCodes.WATCH_CALLBACK, [
-            newValue,
-            // pass undefined as the old value when it's changed for the first time
-            oldValue === INITIAL_WATCHER_VALUE ? undefined : oldValue,
-            onInvalidate
-          ])
-          oldValue = newValue
-        }
+      if (instance && instance.isUnmounted) {
+        return
       }
+      const newValue = runner()
+      if (deep || hasChanged(newValue, oldValue)) {
+        // cleanup before running cb again
+        if (cleanup) {
+          cleanup()
+        }
+        callWithAsyncErrorHandling(cb, instance, ErrorCodes.WATCH_CALLBACK, [
+          newValue,
+          // pass undefined as the old value when it's changed for the first time
+          oldValue === INITIAL_WATCHER_VALUE ? undefined : oldValue,
+          onInvalidate
+        ])
+        oldValue = newValue
+      }
+    }
     : void 0
 
   let scheduler: (job: () => any) => void

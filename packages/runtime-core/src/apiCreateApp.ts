@@ -66,8 +66,8 @@ type PluginInstallFunction = (app: App, ...options: any[]) => any
 export type Plugin =
   | PluginInstallFunction & { install?: PluginInstallFunction }
   | {
-      install: PluginInstallFunction
-    }
+    install: PluginInstallFunction
+  }
 
 export function createAppContext(): AppContext {
   return {
@@ -136,7 +136,7 @@ export function createAppAPI<HostNode, HostElement>(
         } else if (__DEV__) {
           warn(
             `A plugin must either be a function or an object with an "install" ` +
-              `function.`
+            `function.`
           )
         }
         return app
@@ -149,7 +149,7 @@ export function createAppAPI<HostNode, HostElement>(
           } else if (__DEV__) {
             warn(
               'Mixin has already been applied to target app' +
-                (mixin.name ? `: ${mixin.name}` : '')
+              (mixin.name ? `: ${mixin.name}` : '')
             )
           }
         } else if (__DEV__) {
@@ -228,7 +228,7 @@ export function createAppAPI<HostNode, HostElement>(
         if (__DEV__ && key in context.provides) {
           warn(
             `App already provides property with key "${key}". ` +
-              `It will be overwritten with the new value.`
+            `It will be overwritten with the new value.`
           )
         }
         // TypeScript doesn't allow symbols as index type

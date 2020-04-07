@@ -59,7 +59,7 @@ export interface FunctionalComponent<P = {}> extends SFCInternalOptions {
 }
 
 export interface ClassComponent {
-  new (...args: any[]): ComponentPublicInstance<any, any, any, any, any>
+  new(...args: any[]): ComponentPublicInstance<any, any, any, any, any>
   __vccOpts: ComponentOptions
 }
 
@@ -69,7 +69,7 @@ export type Component = ComponentOptions | FunctionalComponent
 // The constructor type is an artificial type returned by defineComponent().
 export type PublicAPIComponent =
   | Component
-  | { new (...args: any[]): ComponentPublicInstance<any, any, any, any, any> }
+  | { new(...args: any[]): ComponentPublicInstance<any, any, any, any, any> }
 
 export { ComponentOptions }
 
@@ -331,11 +331,13 @@ function setupStatefulComponent(
       }
     }
   }
-  // 0. create render proxy property access cache
+  // 0. create render proxy property access cache 
+  // 创建渲染代理属性访问缓存
   instance.accessCache = {}
   // 1. create public instance / render proxy
+  // 创建公共实例/渲染代理
   instance.proxy = new Proxy(instance, PublicInstanceProxyHandlers)
-  // 2. create props proxy
+  // 2. create props proxy 创建props代理
   // the propsProxy is a reactive AND readonly proxy to the actual props.
   // it will be updated in resolveProps() on updates before render
   const propsProxy = (instance.propsProxy = isSSR
@@ -373,7 +375,7 @@ function setupStatefulComponent(
       } else if (__DEV__) {
         warn(
           `setup() returned a Promise, but the version of Vue you are using ` +
-            `does not support it yet.`
+          `does not support it yet.`
         )
       }
     } else {
@@ -397,7 +399,7 @@ export function handleSetupResult(
     if (__DEV__ && isVNode(setupResult)) {
       warn(
         `setup() should not return VNodes directly - ` +
-          `return a render function instead.`
+        `return a render function instead.`
       )
     }
     // setup returned bindings.
@@ -406,7 +408,7 @@ export function handleSetupResult(
   } else if (__DEV__ && setupResult !== undefined) {
     warn(
       `setup() should return an object. Received: ${
-        setupResult === null ? 'null' : typeof setupResult
+      setupResult === null ? 'null' : typeof setupResult
       }`
     )
   }
@@ -442,8 +444,8 @@ function finishComponentSetup(
       Component.render = compile(Component.template, {
         isCustomElement: instance.appContext.config.isCustomElement || NO
       })
-      // mark the function as runtime compiled
-      ;(Component.render as RenderFunction)._rc = true
+        // mark the function as runtime compiled
+        ; (Component.render as RenderFunction)._rc = true
     }
 
     if (__DEV__ && !Component.render) {
@@ -451,8 +453,8 @@ function finishComponentSetup(
       if (!compile && Component.template) {
         warn(
           `Component provides template but the build of Vue you are running ` +
-            `does not support runtime template compilation. Either use the ` +
-            `full build or pre-compile the template using Vue CLI.`
+          `does not support runtime template compilation. Either use the ` +
+          `full build or pre-compile the template using Vue CLI.`
         )
       } else {
         warn(`Component is missing template or render function.`)
@@ -486,26 +488,26 @@ function finishComponentSetup(
 export const SetupProxySymbol = Symbol()
 
 const SetupProxyHandlers: { [key: string]: ProxyHandler<any> } = {}
-;['attrs', 'slots'].forEach((type: string) => {
-  SetupProxyHandlers[type] = {
-    get: (instance, key) => {
-      if (__DEV__) {
-        markAttrsAccessed()
-      }
-      // if the user pass the slots proxy to h(), normalizeChildren should not
-      // attempt to attach ctx to the object
-      if (key === '_') return 1
-      return instance[type][key]
-    },
-    has: (instance, key) => key === SetupProxySymbol || key in instance[type],
-    ownKeys: instance => Reflect.ownKeys(instance[type]),
-    // this is necessary for ownKeys to work properly
-    getOwnPropertyDescriptor: (instance, key) =>
-      Reflect.getOwnPropertyDescriptor(instance[type], key),
-    set: () => false,
-    deleteProperty: () => false
-  }
-})
+  ;['attrs', 'slots'].forEach((type: string) => {
+    SetupProxyHandlers[type] = {
+      get: (instance, key) => {
+        if (__DEV__) {
+          markAttrsAccessed()
+        }
+        // if the user pass the slots proxy to h(), normalizeChildren should not
+        // attempt to attach ctx to the object
+        if (key === '_') return 1
+        return instance[type][key]
+      },
+      has: (instance, key) => key === SetupProxySymbol || key in instance[type],
+      ownKeys: instance => Reflect.ownKeys(instance[type]),
+      // this is necessary for ownKeys to work properly
+      getOwnPropertyDescriptor: (instance, key) =>
+        Reflect.getOwnPropertyDescriptor(instance[type], key),
+      set: () => false,
+      deleteProperty: () => false
+    }
+  })
 
 function createSetupContext(instance: ComponentInternalInstance): SetupContext {
   const context = {
@@ -525,6 +527,6 @@ function createSetupContext(instance: ComponentInternalInstance): SetupContext {
 // stopped when the component unmounts
 export function recordInstanceBoundEffect(effect: ReactiveEffect) {
   if (currentInstance) {
-    ;(currentInstance.effects || (currentInstance.effects = [])).push(effect)
+    ; (currentInstance.effects || (currentInstance.effects = [])).push(effect)
   }
 }

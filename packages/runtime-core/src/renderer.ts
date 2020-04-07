@@ -403,7 +403,7 @@ function baseCreateRenderer<
             optimized
           )
         } else if (shapeFlag & ShapeFlags.PORTAL) {
-          ;(type as typeof PortalImpl).process(
+          ; (type as typeof PortalImpl).process(
             n1,
             n2,
             container,
@@ -415,7 +415,7 @@ function baseCreateRenderer<
             internals
           )
         } else if (__FEATURE_SUSPENSE__ && shapeFlag & ShapeFlags.SUSPENSE) {
-          ;(type as typeof SuspenseImpl).process(
+          ; (type as typeof SuspenseImpl).process(
             n1,
             n2,
             container,
@@ -795,15 +795,15 @@ function baseCreateRenderer<
         // - In the case of a Fragment, we need to provide the actual parent
         // of the Fragment itself so it can move its children.
         oldVNode.type === Fragment ||
-        // - In the case of different nodes, there is going to be a replacement
-        // which also requires the correct parent container
-        !isSameVNodeType(oldVNode, newVNode) ||
-        // - In the case of a component, it could contain anything.
-        oldVNode.shapeFlag & ShapeFlags.COMPONENT
+          // - In the case of different nodes, there is going to be a replacement
+          // which also requires the correct parent container
+          !isSameVNodeType(oldVNode, newVNode) ||
+          // - In the case of a component, it could contain anything.
+          oldVNode.shapeFlag & ShapeFlags.COMPONENT
           ? hostParentNode(oldVNode.el!)!
           : // In other cases, the parent container is not actually used so we
-            // just pass the block element here to avoid a DOM parentNode call.
-            fallbackContainer
+          // just pass the block element here to avoid a DOM parentNode call.
+          fallbackContainer
       patch(
         oldVNode,
         newVNode,
@@ -948,7 +948,7 @@ function baseCreateRenderer<
   ) => {
     if (n1 == null) {
       if (n2.shapeFlag & ShapeFlags.COMPONENT_KEPT_ALIVE) {
-        ;(parentComponent!.sink as KeepAliveSink).activate(
+        ; (parentComponent!.sink as KeepAliveSink).activate(
           n2,
           container,
           anchor
@@ -1002,7 +1002,7 @@ function baseCreateRenderer<
         pushWarningContext(n2)
         warn(
           `Functional components do not support "ref" because they do not ` +
-            `have instances.`
+          `have instances.`
         )
         popWarningContext()
       }
@@ -1678,7 +1678,7 @@ function baseCreateRenderer<
 
     if (shapeFlag & ShapeFlags.COMPONENT) {
       if (shapeFlag & ShapeFlags.COMPONENT_SHOULD_KEEP_ALIVE) {
-        ;(parentComponent!.sink as KeepAliveSink).deactivate(vnode)
+        ; (parentComponent!.sink as KeepAliveSink).deactivate(vnode)
       } else {
         unmountComponent(vnode.component!, parentSuspense, doRemove)
       }
@@ -1851,7 +1851,7 @@ function baseCreateRenderer<
     if (__DEV__ && !owner) {
       warn(
         `Missing ref owner context. ref cannot be used on hoisted vnodes. ` +
-          `A vnode with ref must be created inside the render function.`
+        `A vnode with ref must be created inside the render function.`
       )
       return
     }

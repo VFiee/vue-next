@@ -53,12 +53,12 @@ export function injectHook(
     )}`
     warn(
       `${apiName} is called when there is no active component instance to be ` +
-        `associated with. ` +
-        `Lifecycle injection APIs can only be used during execution of setup().` +
-        (__FEATURE_SUSPENSE__
-          ? ` If you are using async setup(), make sure to register lifecycle ` +
-            `hooks before the first await statement.`
-          : ``)
+      `associated with. ` +
+      `Lifecycle injection APIs can only be used during execution of setup().` +
+      (__FEATURE_SUSPENSE__
+        ? ` If you are using async setup(), make sure to register lifecycle ` +
+        `hooks before the first await statement.`
+        : ``)
     )
   }
 }
@@ -66,8 +66,8 @@ export function injectHook(
 export const createHook = <T extends Function = () => any>(
   lifecycle: LifecycleHooks
 ) => (hook: T, target: ComponentInternalInstance | null = currentInstance) =>
-  // post-create lifecycle registrations are noops during SSR
-  !isInSSRComponentSetup && injectHook(lifecycle, hook, target)
+    // post-create lifecycle registrations are noops during SSR
+    !isInSSRComponentSetup && injectHook(lifecycle, hook, target)
 
 export const onBeforeMount = createHook(LifecycleHooks.BEFORE_MOUNT)
 export const onMounted = createHook(LifecycleHooks.MOUNTED)
