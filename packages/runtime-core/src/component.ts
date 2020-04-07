@@ -2,37 +2,39 @@ import { VNode, VNodeChild, isVNode } from './vnode'
 import {
   reactive,
   ReactiveEffect,
-  shallowReadonly,
   pauseTracking,
   resetTracking
 } from '@vue/reactivity'
 import {
-  PublicInstanceProxyHandlers,
   ComponentPublicInstance,
-  runtimeCompiledRenderProxyHandlers
+  ComponentPublicProxyTarget,
+  PublicInstanceProxyHandlers,
+  RuntimeCompiledPublicInstanceProxyHandlers,
+  createDevProxyTarget,
+  exposePropsOnDevProxyTarget,
+  exposeRenderContextOnDevProxyTarget
 } from './componentProxy'
-import { ComponentPropsOptions, resolveProps } from './componentProps'
-import { Slots, resolveSlots } from './componentSlots'
+import { ComponentPropsOptions, initProps } from './componentProps'
+import { Slots, initSlots, InternalSlots } from './componentSlots'
 import { warn } from './warning'
-import {
-  ErrorCodes,
-  callWithErrorHandling,
-  callWithAsyncErrorHandling
-} from './errorHandling'
+import { ErrorCodes, callWithErrorHandling } from './errorHandling'
 import { AppContext, createAppContext, AppConfig } from './apiCreateApp'
 import { Directive, validateDirectiveName } from './directives'
-import { applyOptions, ComponentOptions } from './apiOptions'
+import { applyOptions, ComponentOptions } from './componentOptions'
+import {
+  EmitsOptions,
+  ObjectEmitsOptions,
+  EmitFn,
+  emit
+} from './componentEmits'
 import {
   EMPTY_OBJ,
   isFunction,
-  capitalize,
   NOOP,
   isObject,
   NO,
   makeMap,
   isPromise,
-  isArray,
-  hyphenate,
   ShapeFlags
 } from '@vue/shared'
 import { SuspenseBoundary } from './components/Suspense'
@@ -41,6 +43,7 @@ import {
   currentRenderingInstance,
   markAttrsAccessed
 } from './componentRenderUtils'
+import { startMeasure, endMeasure } from './profiling'
 
 export type Data = { [key: string]: unknown }
 
@@ -51,9 +54,13 @@ export interface SFCInternalOptions {
   __hmrUpdated?: boolean
 }
 
-export interface FunctionalComponent<P = {}> extends SFCInternalOptions {
-  (props: P, ctx: SetupContext): VNodeChild
+export interface FunctionalComponent<
+  P = {},
+  E extends EmitsOptions = Record<string, any>
+  > extends SFCInternalOptions {
+  (props: P, ctx: SetupContext<E>): any
   props?: ComponentPropsOptions<P>
+  emits?: E | (keyof E)[]
   inheritAttrs?: boolean
   displayName?: string
 }
@@ -63,7 +70,7 @@ export interface ClassComponent {
   __vccOpts: ComponentOptions
 }
 
-export type Component = ComponentOptions | FunctionalComponent
+export type Component = ComponentOptions | FunctionalComponent<any>
 
 // A type used in public APIs where a component type is expected.
 // The constructor type is an artificial type returned by defineComponent().
@@ -91,20 +98,22 @@ export const enum LifecycleHooks {
   ERROR_CAPTURED = 'ec'
 }
 
-export type Emit = (event: string, ...args: unknown[]) => any[]
-
-export interface SetupContext {
+export interface SetupContext<E = ObjectEmitsOptions> {
   attrs: Data
   slots: Slots
-  emit: Emit
+  emit: EmitFn<E>
 }
 
 export type RenderFunction = {
-  (): VNodeChild
+  (
+    ctx: ComponentPublicInstance,
+    cache: ComponentInternalInstance['renderCache']
+  ): VNodeChild
   _rc?: boolean // isRuntimeCompiled
 }
 
 export interface ComponentInternalInstance {
+  uid: number
   type: Component
   parent: ComponentInternalInstance | null
   appContext: AppContext
@@ -131,17 +140,18 @@ export interface ComponentInternalInstance {
   data: Data
   props: Data
   attrs: Data
-  slots: Slots
+  slots: InternalSlots
   proxy: ComponentPublicInstance | null
+  proxyTarget: ComponentPublicProxyTarget
   // alternative proxy used only for runtime-compiled render functions using
   // `with` block
   withProxy: ComponentPublicInstance | null
-  propsProxy: Data | null
   setupContext: SetupContext | null
   refs: Data
-  emit: Emit
+  emit: EmitFn
 
   // suspense related
+  suspense: SuspenseBoundary | null
   asyncDep: Promise<any> | null
   asyncResolved: boolean
 
@@ -172,26 +182,30 @@ export interface ComponentInternalInstance {
 
 const emptyAppContext = createAppContext()
 
+let uid = 0
+
 export function createComponentInstance(
   vnode: VNode,
-  parent: ComponentInternalInstance | null
+  parent: ComponentInternalInstance | null,
+  suspense: SuspenseBoundary | null
 ) {
   // inherit parent app context - or - if root, adopt from root vnode
   const appContext =
     (parent ? parent.appContext : vnode.appContext) || emptyAppContext
   const instance: ComponentInternalInstance = {
+    uid: uid++,
     vnode,
     parent,
     appContext,
     type: vnode.type as Component,
-    root: null!, // set later so it can point to itself
+    root: null!, // to be immediately set
     next: null,
     subTree: null!, // will be set synchronously right after creation
     update: null!, // will be set synchronously right after creation
     render: null,
     proxy: null,
+    proxyTarget: null!, // to be immediately set
     withProxy: null,
-    propsProxy: null,
     setupContext: null,
     effects: null,
     provides: parent ? parent.provides : Object.create(appContext.provides),
@@ -210,7 +224,8 @@ export function createComponentInstance(
     components: Object.create(appContext.components),
     directives: Object.create(appContext.directives),
 
-    // async dependency management
+    // suspense related
+    suspense,
     asyncDep: null,
     asyncResolved: false,
 
@@ -236,34 +251,19 @@ export function createComponentInstance(
     rtg: null,
     rtc: null,
     ec: null,
-
-    emit: (event, ...args): any[] => {
-      const props = instance.vnode.props || EMPTY_OBJ
-      let handler = props[`on${event}`] || props[`on${capitalize(event)}`]
-      if (!handler && event.indexOf('update:') === 0) {
-        event = hyphenate(event)
-        handler = props[`on${event}`] || props[`on${capitalize(event)}`]
-      }
-      if (handler) {
-        const res = callWithAsyncErrorHandling(
-          handler,
-          instance,
-          ErrorCodes.COMPONENT_EVENT_HANDLER,
-          args
-        )
-        return isArray(res) ? res : [res]
-      } else {
-        return []
-      }
-    }
+    emit: null as any // to be set immediately
   }
-
+  if (__DEV__) {
+    instance.proxyTarget = createDevProxyTarget(instance)
+  } else {
+    instance.proxyTarget = { _: instance }
+  }
   instance.root = parent ? parent.root : instance
+  instance.emit = emit.bind(null, instance)
   return instance
 }
 
 export let currentInstance: ComponentInternalInstance | null = null
-export let currentSuspense: SuspenseBoundary | null = null
 
 export const getCurrentInstance: () => ComponentInternalInstance | null = () =>
   currentInstance || currentRenderingInstance
@@ -289,27 +289,24 @@ export let isInSSRComponentSetup = false
 
 export function setupComponent(
   instance: ComponentInternalInstance,
-  parentSuspense: SuspenseBoundary | null,
   isSSR = false
 ) {
   isInSSRComponentSetup = isSSR
-  const propsOptions = instance.type.props
-  const { props, children, shapeFlag } = instance.vnode
-  resolveProps(instance, props, propsOptions)
-  resolveSlots(instance, children)
 
-  // setup stateful logic
-  let setupResult
-  if (shapeFlag & ShapeFlags.STATEFUL_COMPONENT) {
-    setupResult = setupStatefulComponent(instance, parentSuspense, isSSR)
-  }
+  const { props, children, shapeFlag } = instance.vnode
+  const isStateful = shapeFlag & ShapeFlags.STATEFUL_COMPONENT
+  initProps(instance, props, isStateful, isSSR)
+  initSlots(instance, children)
+
+  const setupResult = isStateful
+    ? setupStatefulComponent(instance, isSSR)
+    : undefined
   isInSSRComponentSetup = false
   return setupResult
 }
 
 function setupStatefulComponent(
   instance: ComponentInternalInstance,
-  parentSuspense: SuspenseBoundary | null,
   isSSR: boolean
 ) {
   const Component = instance.type as ComponentOptions
@@ -335,38 +332,32 @@ function setupStatefulComponent(
   // 创建渲染代理属性访问缓存
   instance.accessCache = {}
   // 1. create public instance / render proxy
-  // 创建公共实例/渲染代理
-  instance.proxy = new Proxy(instance, PublicInstanceProxyHandlers)
-  // 2. create props proxy 创建props代理
-  // the propsProxy is a reactive AND readonly proxy to the actual props.
-  // it will be updated in resolveProps() on updates before render
-  const propsProxy = (instance.propsProxy = isSSR
-    ? instance.props
-    : shallowReadonly(instance.props))
-  // 3. call setup()
+  instance.proxy = new Proxy(instance.proxyTarget, PublicInstanceProxyHandlers)
+  if (__DEV__) {
+    exposePropsOnDevProxyTarget(instance)
+  }
+  // 2. call setup()
   const { setup } = Component
   if (setup) {
     const setupContext = (instance.setupContext =
       setup.length > 1 ? createSetupContext(instance) : null)
 
     currentInstance = instance
-    currentSuspense = parentSuspense
     pauseTracking()
     const setupResult = callWithErrorHandling(
       setup,
       instance,
       ErrorCodes.SETUP_FUNCTION,
-      [propsProxy, setupContext]
+      [instance.props, setupContext]
     )
     resetTracking()
     currentInstance = null
-    currentSuspense = null
 
     if (isPromise(setupResult)) {
       if (isSSR) {
         // return the promise so server-renderer can wait on it
         return setupResult.then((resolvedResult: unknown) => {
-          handleSetupResult(instance, resolvedResult, parentSuspense, isSSR)
+          handleSetupResult(instance, resolvedResult, isSSR)
         })
       } else if (__FEATURE_SUSPENSE__) {
         // async setup returned Promise.
@@ -379,17 +370,16 @@ function setupStatefulComponent(
         )
       }
     } else {
-      handleSetupResult(instance, setupResult, parentSuspense, isSSR)
+      handleSetupResult(instance, setupResult, isSSR)
     }
   } else {
-    finishComponentSetup(instance, parentSuspense, isSSR)
+    finishComponentSetup(instance, isSSR)
   }
 }
 
 export function handleSetupResult(
   instance: ComponentInternalInstance,
   setupResult: unknown,
-  parentSuspense: SuspenseBoundary | null,
   isSSR: boolean
 ) {
   if (isFunction(setupResult)) {
@@ -405,6 +395,9 @@ export function handleSetupResult(
     // setup returned bindings.
     // assuming a render function compiled from template is present.
     instance.renderContext = reactive(setupResult)
+    if (__DEV__) {
+      exposeRenderContextOnDevProxyTarget(instance)
+    }
   } else if (__DEV__ && setupResult !== undefined) {
     warn(
       `setup() should return an object. Received: ${
@@ -412,7 +405,7 @@ export function handleSetupResult(
       }`
     )
   }
-  finishComponentSetup(instance, parentSuspense, isSSR)
+  finishComponentSetup(instance, isSSR)
 }
 
 type CompileFunction = (
@@ -429,7 +422,6 @@ export function registerRuntimeCompiler(_compile: any) {
 
 function finishComponentSetup(
   instance: ComponentInternalInstance,
-  parentSuspense: SuspenseBoundary | null,
   isSSR: boolean
 ) {
   const Component = instance.type as ComponentOptions
@@ -441,11 +433,17 @@ function finishComponentSetup(
     }
   } else if (!instance.render) {
     if (compile && Component.template && !Component.render) {
+      if (__DEV__) {
+        startMeasure(instance, `compile`)
+      }
       Component.render = compile(Component.template, {
         isCustomElement: instance.appContext.config.isCustomElement || NO
       })
-        // mark the function as runtime compiled
-        ; (Component.render as RenderFunction)._rc = true
+      if (__DEV__) {
+        endMeasure(instance, `compile`)
+      }
+      // mark the function as runtime compiled
+      ; (Component.render as RenderFunction)._rc = true
     }
 
     if (__DEV__ && !Component.render) {
@@ -468,8 +466,8 @@ function finishComponentSetup(
     // also only allows a whitelist of globals to fallthrough.
     if (instance.render._rc) {
       instance.withProxy = new Proxy(
-        instance,
-        runtimeCompiledRenderProxyHandlers
+        instance.proxyTarget,
+        RuntimeCompiledPublicInstanceProxyHandlers
       )
     }
   }
@@ -477,50 +475,59 @@ function finishComponentSetup(
   // support for 2.x options
   if (__FEATURE_OPTIONS__) {
     currentInstance = instance
-    currentSuspense = parentSuspense
     applyOptions(instance, Component)
     currentInstance = null
-    currentSuspense = null
   }
 }
 
-// used to identify a setup context proxy
-export const SetupProxySymbol = Symbol()
+const slotsHandlers: ProxyHandler<InternalSlots> = {
+  set: () => {
+    warn(`setupContext.slots is readonly.`)
+    return false
+  },
+  deleteProperty: () => {
+    warn(`setupContext.slots is readonly.`)
+    return false
+  }
+}
 
-const SetupProxyHandlers: { [key: string]: ProxyHandler<any> } = {}
-  ;['attrs', 'slots'].forEach((type: string) => {
-    SetupProxyHandlers[type] = {
-      get: (instance, key) => {
-        if (__DEV__) {
-          markAttrsAccessed()
-        }
-        // if the user pass the slots proxy to h(), normalizeChildren should not
-        // attempt to attach ctx to the object
-        if (key === '_') return 1
-        return instance[type][key]
-      },
-      has: (instance, key) => key === SetupProxySymbol || key in instance[type],
-      ownKeys: instance => Reflect.ownKeys(instance[type]),
-      // this is necessary for ownKeys to work properly
-      getOwnPropertyDescriptor: (instance, key) =>
-        Reflect.getOwnPropertyDescriptor(instance[type], key),
-      set: () => false,
-      deleteProperty: () => false
-    }
-  })
+const attrHandlers: ProxyHandler<Data> = {
+  get: (target, key: string) => {
+    markAttrsAccessed()
+    return target[key]
+  },
+  set: () => {
+    warn(`setupContext.attrs is readonly.`)
+    return false
+  },
+  deleteProperty: () => {
+    warn(`setupContext.attrs is readonly.`)
+    return false
+  }
+}
 
 function createSetupContext(instance: ComponentInternalInstance): SetupContext {
-  const context = {
-    // attrs & slots are non-reactive, but they need to always expose
-    // the latest values (instance.xxx may get replaced during updates) so we
-    // need to expose them through a proxy
-    attrs: new Proxy(instance, SetupProxyHandlers.attrs),
-    slots: new Proxy(instance, SetupProxyHandlers.slots),
-    get emit() {
-      return instance.emit
+  if (__DEV__) {
+    // We use getters in dev in case libs like test-utils overwrite instance
+    // properties (overwrites should not be done in prod)
+    return Object.freeze({
+      get attrs() {
+        return new Proxy(instance.attrs, attrHandlers)
+      },
+      get slots() {
+        return new Proxy(instance.slots, slotsHandlers)
+      },
+      get emit() {
+        return instance.emit
+      }
+    })
+  } else {
+    return {
+      attrs: instance.attrs,
+      slots: instance.slots,
+      emit: instance.emit
     }
   }
-  return __DEV__ ? Object.freeze(context) : context
 }
 
 // record effects created during a component's setup() so that they can be
@@ -529,4 +536,24 @@ export function recordInstanceBoundEffect(effect: ReactiveEffect) {
   if (currentInstance) {
     ; (currentInstance.effects || (currentInstance.effects = [])).push(effect)
   }
+}
+
+const classifyRE = /(?:^|[-_])(\w)/g
+const classify = (str: string): string =>
+  str.replace(classifyRE, c => c.toUpperCase()).replace(/[-_]/g, '')
+
+export function formatComponentName(
+  Component: Component,
+  file?: string
+): string {
+  let name = isFunction(Component)
+    ? Component.displayName || Component.name
+    : Component.name
+  if (!name && file) {
+    const match = file.match(/([^/\\]+)\.vue$/)
+    if (match) {
+      name = match[1]
+    }
+  }
+  return name ? classify(name) : 'Anonymous'
 }

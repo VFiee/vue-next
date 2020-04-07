@@ -4,7 +4,8 @@ import {
   SetupContext,
   RenderFunction,
   SFCInternalOptions,
-  PublicAPIComponent
+  PublicAPIComponent,
+  Component
 } from './component'
 import {
   isFunction,
@@ -13,7 +14,8 @@ import {
   isObject,
   isArray,
   EMPTY_OBJ,
-  NOOP
+  NOOP,
+  hasOwn
 } from '@vue/shared'
 import { computed } from './apiComputed'
 import { watch, WatchOptions, WatchCallback } from './apiWatch'
@@ -36,9 +38,15 @@ import {
 import {
   reactive,
   ComputedGetter,
-  WritableComputedOptions
+  WritableComputedOptions,
+  ComputedRef
 } from '@vue/reactivity'
-import { ComponentObjectPropsOptions, ExtractPropTypes } from './componentProps'
+import {
+  ComponentObjectPropsOptions,
+  ExtractPropTypes,
+  normalizePropsOptions
+} from './componentProps'
+import { EmitsOptions } from './componentEmits'
 import { Directive } from './directives'
 import { ComponentPublicInstance } from './componentProxy'
 import { warn } from './warning'
@@ -48,12 +56,14 @@ export interface ComponentOptionsBase<
   RawBindings,
   D,
   C extends ComputedOptions,
-  M extends MethodOptions
-  > extends LegacyOptions<Props, RawBindings, D, C, M>, SFCInternalOptions {
+  M extends MethodOptions,
+  E extends EmitsOptions,
+  EE extends string = string
+> extends LegacyOptions<Props, D, C, M>, SFCInternalOptions {
   setup?: (
     this: void,
     props: Props,
-    ctx: SetupContext
+    ctx: SetupContext<E>
   ) => RawBindings | RenderFunction | void
   name?: string
   template?: string | object // can be a direct DOM node
@@ -73,13 +83,21 @@ export interface ComponentOptionsBase<
   components?: Record<string, PublicAPIComponent>
   directives?: Record<string, Directive>
   inheritAttrs?: boolean
+  emits?: E | EE[]
+
+  // Internal ------------------------------------------------------------------
+
+  // marker for AsyncComponentWrapper
+  __asyncLoader?: () => Promise<Component>
+  // cache for merged $options
+  __merged?: ComponentOptions
 
   // type-only differentiator to separate OptionWithoutProps from a constructor
   // type returned by defineComponent() or FunctionalComponent
   call?: never
   // type-only differentiators for built-in Vnode types
   __isFragment?: never
-  __isPortal?: never
+  __isTeleport?: never
   __isSuspense?: never
 }
 
@@ -88,10 +106,14 @@ export type ComponentOptionsWithoutProps<
   RawBindings = {},
   D = {},
   C extends ComputedOptions = {},
-  M extends MethodOptions = {}
-  > = ComponentOptionsBase<Readonly<Props>, RawBindings, D, C, M> & {
-    props?: undefined
-  } & ThisType<ComponentPublicInstance<{}, RawBindings, D, C, M, Readonly<Props>>>
+  M extends MethodOptions = {},
+  E extends EmitsOptions = EmitsOptions,
+  EE extends string = string
+> = ComponentOptionsBase<Props, RawBindings, D, C, M, E, EE> & {
+  props?: undefined
+} & ThisType<
+    ComponentPublicInstance<{}, RawBindings, D, C, M, E, Readonly<Props>>
+  >
 
 export type ComponentOptionsWithArrayProps<
   PropNames extends string = string,
@@ -99,10 +121,12 @@ export type ComponentOptionsWithArrayProps<
   D = {},
   C extends ComputedOptions = {},
   M extends MethodOptions = {},
+  E extends EmitsOptions = EmitsOptions,
+  EE extends string = string,
   Props = Readonly<{ [key in PropNames]?: any }>
-  > = ComponentOptionsBase<Props, RawBindings, D, C, M> & {
-    props: PropNames[]
-  } & ThisType<ComponentPublicInstance<Props, RawBindings, D, C, M>>
+> = ComponentOptionsBase<Props, RawBindings, D, C, M, E, EE> & {
+  props: PropNames[]
+} & ThisType<ComponentPublicInstance<Props, RawBindings, D, C, M, E>>
 
 export type ComponentOptionsWithObjectProps<
   PropsOptions = ComponentObjectPropsOptions,
@@ -110,18 +134,17 @@ export type ComponentOptionsWithObjectProps<
   D = {},
   C extends ComputedOptions = {},
   M extends MethodOptions = {},
+  E extends EmitsOptions = EmitsOptions,
+  EE extends string = string,
   Props = Readonly<ExtractPropTypes<PropsOptions>>
-  > = ComponentOptionsBase<Props, RawBindings, D, C, M> & {
-    props: PropsOptions
-  } & ThisType<ComponentPublicInstance<Props, RawBindings, D, C, M>>
+> = ComponentOptionsBase<Props, RawBindings, D, C, M, E, EE> & {
+  props: PropsOptions
+} & ThisType<ComponentPublicInstance<Props, RawBindings, D, C, M, E>>
 
 export type ComponentOptions =
-  | ComponentOptionsWithoutProps
-  | ComponentOptionsWithObjectProps
-  | ComponentOptionsWithArrayProps
-
-// TODO legacy component definition also supports constructors with .options
-type LegacyComponent = ComponentOptions
+  | ComponentOptionsWithoutProps<any, any, any, any, any>
+  | ComponentOptionsWithObjectProps<any, any, any, any, any>
+  | ComponentOptionsWithArrayProps<any, any, any, any, any>
 
 export type ComputedOptions = Record<
   string,
@@ -156,18 +179,21 @@ type ComponentInjectOptions =
 
 export interface LegacyOptions<
   Props,
-  RawBindings,
   D,
   C extends ComputedOptions,
   M extends MethodOptions
-  > {
-  el?: any
+> {
+  // allow any custom options
+  [key: string]: any
 
   // state
   // Limitation: we cannot expose RawBindings on the `this` context for data
   // since that leads to some sort of circular inference and breaks ThisType
   // for the entire component.
-  data?: (this: ComponentPublicInstance<Props>) => D
+  data?: (
+    this: ComponentPublicInstance<Props>,
+    vm: ComponentPublicInstance<Props>
+  ) => D
   computed?: C
   methods?: M
   watch?: ComponentWatchOptions
@@ -175,8 +201,8 @@ export interface LegacyOptions<
   inject?: ComponentInjectOptions
 
   // composition
-  mixins?: LegacyComponent[]
-  extends?: LegacyComponent
+  mixins?: ComponentOptions[]
+  extends?: ComponentOptions
 
   // lifecycle
   beforeCreate?(): void
@@ -218,6 +244,7 @@ export function applyOptions(
   options: ComponentOptions,
   asMixin: boolean = false
 ) {
+  const proxyTarget = instance.proxyTarget
   const ctx = instance.proxy!
   const {
     // composition
@@ -256,7 +283,7 @@ export function applyOptions(
 
   const globalMixins = instance.appContext.mixins
   // call it only during dev
-  const checkDuplicateProperties = __DEV__ ? createDuplicateChecker() : null
+
   // applyOptions is called non-as-mixin once per instance
   if (!asMixin) {
     callSyncHook('beforeCreate', options, ctx, globalMixins)
@@ -272,8 +299,10 @@ export function applyOptions(
     applyMixins(instance, mixins)
   }
 
+  const checkDuplicateProperties = __DEV__ ? createDuplicateChecker() : null
+
   if (__DEV__ && propsOptions) {
-    for (const key in propsOptions) {
+    for (const key in normalizePropsOptions(propsOptions)[0]) {
       checkDuplicateProperties!(OptionTypes.PROPS, key)
     }
   }
@@ -293,6 +322,7 @@ export function applyOptions(
       if (__DEV__) {
         for (const key in data) {
           checkDuplicateProperties!(OptionTypes.DATA, key)
+          if (!(key in proxyTarget)) proxyTarget[key] = data[key]
         }
       }
       instance.data = reactive(data)
@@ -305,9 +335,6 @@ export function applyOptions(
   if (computedOptions) {
     for (const key in computedOptions) {
       const opt = (computedOptions as ComputedOptions)[key]
-
-      __DEV__ && checkDuplicateProperties!(OptionTypes.COMPUTED, key)
-
       if (isFunction(opt)) {
         renderContext[key] = computed(opt.bind(ctx, ctx))
       } else {
@@ -329,6 +356,15 @@ export function applyOptions(
           warn(`Computed property "${key}" has no getter.`)
         }
       }
+      if (__DEV__) {
+        checkDuplicateProperties!(OptionTypes.COMPUTED, key)
+        if (renderContext[key] && !(key in proxyTarget)) {
+          Object.defineProperty(proxyTarget, key, {
+            enumerable: true,
+            get: () => (renderContext[key] as ComputedRef).value
+          })
+        }
+      }
     }
   }
 
@@ -336,8 +372,13 @@ export function applyOptions(
     for (const key in methods) {
       const methodHandler = (methods as MethodOptions)[key]
       if (isFunction(methodHandler)) {
-        __DEV__ && checkDuplicateProperties!(OptionTypes.METHODS, key)
         renderContext[key] = methodHandler.bind(ctx)
+        if (__DEV__) {
+          checkDuplicateProperties!(OptionTypes.METHODS, key)
+          if (!(key in proxyTarget)) {
+            proxyTarget[key] = renderContext[key]
+          }
+        }
       } else if (__DEV__) {
         warn(
           `Method "${key}" has type "${typeof methodHandler}" in the component definition. ` +
@@ -366,17 +407,23 @@ export function applyOptions(
     if (isArray(injectOptions)) {
       for (let i = 0; i < injectOptions.length; i++) {
         const key = injectOptions[i]
-        __DEV__ && checkDuplicateProperties!(OptionTypes.INJECT, key)
         renderContext[key] = inject(key)
+        if (__DEV__) {
+          checkDuplicateProperties!(OptionTypes.INJECT, key)
+          proxyTarget[key] = renderContext[key]
+        }
       }
     } else {
       for (const key in injectOptions) {
-        __DEV__ && checkDuplicateProperties!(OptionTypes.INJECT, key)
         const opt = injectOptions[key]
         if (isObject(opt)) {
           renderContext[key] = inject(opt.from, opt.default)
         } else {
           renderContext[key] = inject(opt)
+        }
+        if (__DEV__) {
+          checkDuplicateProperties!(OptionTypes.INJECT, key)
+          proxyTarget[key] = renderContext[key]
         }
       }
     }
@@ -496,5 +543,33 @@ function createWatcher(
     }
   } else if (__DEV__) {
     warn(`Invalid watch option: "${key}"`)
+  }
+}
+
+export function resolveMergedOptions(
+  instance: ComponentInternalInstance
+): ComponentOptions {
+  const raw = instance.type as ComponentOptions
+  const { __merged, mixins, extends: extendsOptions } = raw
+  if (__merged) return __merged
+  const globalMixins = instance.appContext.mixins
+  if (!globalMixins.length && !mixins && !extendsOptions) return raw
+  const options = {}
+  globalMixins.forEach(m => mergeOptions(options, m, instance))
+  extendsOptions && mergeOptions(options, extendsOptions, instance)
+  mixins && mixins.forEach(m => mergeOptions(options, m, instance))
+  mergeOptions(options, raw, instance)
+  return (raw.__merged = options)
+}
+
+function mergeOptions(to: any, from: any, instance: ComponentInternalInstance) {
+  const strats = instance.appContext.config.optionMergeStrategies
+  for (const key in from) {
+    const strat = strats && strats[key]
+    if (strat) {
+      to[key] = strat(to[key], from[key], instance.proxy, key)
+    } else if (!hasOwn(to, key)) {
+      to[key] = from[key]
+    }
   }
 }

@@ -28,7 +28,7 @@ import {
   RESOLVE_DYNAMIC_COMPONENT,
   MERGE_PROPS,
   TO_HANDLERS,
-  PORTAL,
+  TELEPORT,
   KEEP_ALIVE
 } from '../runtimeHelpers'
 import {
@@ -36,7 +36,8 @@ import {
   toValidAssetId,
   findProp,
   isCoreComponent,
-  isBindKey
+  isBindKey,
+  findDir
 } from '../utils'
 import { buildSlots } from './vSlot'
 import { isStaticNode } from './hoistStatic'
@@ -123,8 +124,8 @@ export const transformElement: NodeTransform = (node, context) => {
 
       const shouldBuildAsSlots =
         isComponent &&
-        // Portal is not a real component has dedicated handling in the renderer
-        vnodeTag !== PORTAL &&
+        // Teleport is not a real component and has dedicated runtime handling
+        vnodeTag !== TELEPORT &&
         // explained above.
         vnodeTag !== KEEP_ALIVE
 
@@ -134,7 +135,7 @@ export const transformElement: NodeTransform = (node, context) => {
         if (hasDynamicSlots) {
           patchFlag |= PatchFlags.DYNAMIC_SLOTS
         }
-      } else if (node.children.length === 1) {
+      } else if (node.children.length === 1 && vnodeTag !== TELEPORT) {
         const child = node.children[0]
         const type = child.type
         // check for dynamic text children
@@ -202,26 +203,21 @@ export function resolveComponentType(
   const { tag } = node
 
   // 1. dynamic component
-  const isProp = node.tag === 'component' && findProp(node, 'is')
+  const isProp =
+    node.tag === 'component' ? findProp(node, 'is') : findDir(node, 'is')
   if (isProp) {
-    // static <component is="foo" />
-    if (isProp.type === NodeTypes.ATTRIBUTE) {
-      const isType = isProp.value && isProp.value.content
-      if (isType) {
-        context.helper(RESOLVE_COMPONENT)
-        context.components.add(isType)
-        return toValidAssetId(isType, `component`)
-      }
-    }
-    // dynamic <component :is="asdf" />
-    else if (isProp.exp) {
+    const exp =
+      isProp.type === NodeTypes.ATTRIBUTE
+        ? isProp.value && createSimpleExpression(isProp.value.content, true)
+        : isProp.exp
+    if (exp) {
       return createCallExpression(context.helper(RESOLVE_DYNAMIC_COMPONENT), [
-        isProp.exp
+        exp
       ])
     }
   }
 
-  // 2. built-in components (Portal, Transition, KeepAlive, Suspense...)
+  // 2. built-in components (Teleport, Transition, KeepAlive, Suspense...)
   const builtIn = isCoreComponent(tag) || context.isBuiltInComponent(tag)
   if (builtIn) {
     // built-ins are simply fallthroughs / have special handling during ssr
@@ -346,8 +342,11 @@ export function buildProps(
       if (name === 'once') {
         continue
       }
-      // skip :is on <component>
-      if (isBind && tag === 'component' && isBindKey(arg, 'is')) {
+      // skip v-is and :is on <component>
+      if (
+        name === 'is' ||
+        (isBind && tag === 'component' && isBindKey(arg, 'is'))
+      ) {
         continue
       }
       // skip v-on in SSR compilation

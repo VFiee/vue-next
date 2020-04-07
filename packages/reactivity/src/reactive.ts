@@ -33,7 +33,8 @@ const canObserve = (value: any): boolean => {
     !value._isVue &&
     !value._isVNode &&
     isObservableType(toRawType(value)) &&
-    !nonReactiveValues.has(value)
+    !nonReactiveValues.has(value) &&
+    !Object.isFrozen(value)
   )
 }
 
@@ -160,7 +161,7 @@ export function markReadonly<T>(value: T): T {
   return value
 }
 
-export function markNonReactive<T>(value: T): T {
+export function markNonReactive<T extends object>(value: T): T {
   nonReactiveValues.add(value)
   return value
 }

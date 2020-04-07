@@ -105,7 +105,7 @@ describe('reactivity/reactive', () => {
     // writable
     const b = computed({
       get: () => 1,
-      set: () => {}
+      set: () => { }
     })
     const obj = reactive({ a, b })
     // check type
@@ -154,7 +154,14 @@ describe('reactivity/reactive', () => {
     expect(isReactive(obj.foo)).toBe(true)
     expect(isReactive(obj.bar)).toBe(false)
   })
-  // 浅响应
+
+  test('should not observe frozen objects', () => {
+    const obj = reactive({
+      foo: Object.freeze({ a: 1 })
+    })
+    expect(isReactive(obj.foo)).toBe(false)
+  })
+
   describe('shallowReactive', () => {
     // 不应使非响应式响应
     test('should not make non-reactive properties reactive', () => {

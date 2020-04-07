@@ -2,6 +2,7 @@
 
 export const version = __VERSION__
 export {
+  effect,
   ref,
   unref,
   shallowRef,
@@ -34,7 +35,7 @@ export {
 export { provide, inject } from './apiInject'
 export { nextTick } from './scheduler'
 export { defineComponent } from './apiDefineComponent'
-export { createAsyncComponent } from './apiAsyncComponent'
+export { defineAsyncComponent } from './apiAsyncComponent'
 
 // Advanced API ----------------------------------------------------------------
 
@@ -53,7 +54,7 @@ export {
 } from './vnode'
 // Internal Components
 export { Text, Comment, Fragment } from './vnode'
-export { Portal, PortalProps } from './components/Portal'
+export { Teleport, TeleportProps } from './components/Teleport'
 export { Suspense, SuspenseProps } from './components/Suspense'
 export { KeepAlive, KeepAliveProps } from './components/KeepAlive'
 export {
@@ -109,6 +110,9 @@ export { toDisplayString, camelize } from '@vue/shared'
 // For integration with runtime compiler
 export { registerRuntimeCompiler } from './component'
 
+// For test-utils
+export { transformVNodeArgs } from './vnode'
+
 // SSR -------------------------------------------------------------------------
 
 import { createComponentInstance, setupComponent } from './component'
@@ -147,6 +151,8 @@ export {
 } from '@vue/reactivity'
 export {
   // types
+  WatchEffect,
+  BaseWatchOptions,
   WatchOptions,
   WatchCallback,
   WatchSource,
@@ -158,7 +164,8 @@ export {
   AppConfig,
   AppContext,
   Plugin,
-  CreateAppFunction
+  CreateAppFunction,
+  OptionMergeFunction
 } from './apiCreateApp'
 export {
   VNode,
@@ -179,10 +186,12 @@ export {
   ComponentOptionsWithoutProps,
   ComponentOptionsWithObjectProps as ComponentOptionsWithProps,
   ComponentOptionsWithArrayProps
-} from './apiOptions'
+} from './componentOptions'
 export { ComponentPublicInstance } from './componentProxy'
 export {
   Renderer,
+  RendererNode,
+  RendererElement,
   HydrationRenderer,
   RendererOptions,
   RootRenderFunction

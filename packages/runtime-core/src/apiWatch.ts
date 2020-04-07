@@ -20,7 +20,6 @@ import {
 import {
   currentInstance,
   ComponentInternalInstance,
-  currentSuspense,
   Data,
   isInSSRComponentSetup,
   recordInstanceBoundEffect
@@ -139,7 +138,6 @@ function doWatch(
   }
 
   const instance = currentInstance
-  const suspense = currentSuspense
 
   let getter: () => any
   if (isArray(source)) {
@@ -179,7 +177,7 @@ function doWatch(
     getter = () => traverse(baseGetter())
   }
 
-  let cleanup: Function
+  let cleanup: () => void
   const onInvalidate: InvalidateCbRegistrator = (fn: () => void) => {
     cleanup = runner.options.onStop = () => {
       callWithErrorHandling(fn, instance, ErrorCodes.WATCH_CLEANUP)
@@ -238,9 +236,7 @@ function doWatch(
       }
     }
   } else {
-    scheduler = job => {
-      queuePostRenderEffect(job, suspense)
-    }
+    scheduler = job => queuePostRenderEffect(job, instance && instance.suspense)
   }
 
   const runner = effect(getter, {

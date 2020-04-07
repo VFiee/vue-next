@@ -11,7 +11,7 @@ import {
   RESOLVE_DIRECTIVE,
   TO_HANDLERS,
   helperNameMap,
-  PORTAL,
+  TELEPORT,
   RESOLVE_DYNAMIC_COMPONENT,
   SUSPENSE,
   KEEP_ALIVE,
@@ -272,16 +272,16 @@ describe('compiler: element transform', () => {
     })
   })
 
-  test('should handle <Portal> with normal children', () => {
+  test('should handle <Teleport> with normal children', () => {
     function assert(tag: string) {
       const { root, node } = parseWithElementTransform(
         `<${tag} target="#foo"><span /></${tag}>`
       )
       expect(root.components.length).toBe(0)
-      expect(root.helpers).toContain(PORTAL)
+      expect(root.helpers).toContain(TELEPORT)
 
       expect(node).toMatchObject({
-        tag: PORTAL,
+        tag: TELEPORT,
         props: createObjectMatcher({
           target: '#foo'
         }),
@@ -298,8 +298,8 @@ describe('compiler: element transform', () => {
       })
     }
 
-    assert(`portal`)
-    assert(`Portal`)
+    assert(`teleport`)
+    assert(`Teleport`)
   })
 
   test('should handle <Suspense>', () => {
@@ -798,9 +798,18 @@ describe('compiler: element transform', () => {
   describe('dynamic component', () => {
     test('static binding', () => {
       const { node, root } = parseWithBind(`<component is="foo" />`)
-      expect(root.helpers).not.toContain(RESOLVE_DYNAMIC_COMPONENT)
+      expect(root.helpers).toContain(RESOLVE_DYNAMIC_COMPONENT)
       expect(node).toMatchObject({
-        tag: '_component_foo'
+        tag: {
+          callee: RESOLVE_DYNAMIC_COMPONENT,
+          arguments: [
+            {
+              type: NodeTypes.SIMPLE_EXPRESSION,
+              content: 'foo',
+              isStatic: true
+            }
+          ]
+        }
       })
     })
 
@@ -813,10 +822,30 @@ describe('compiler: element transform', () => {
           arguments: [
             {
               type: NodeTypes.SIMPLE_EXPRESSION,
-              content: 'foo'
+              content: 'foo',
+              isStatic: false
             }
           ]
         }
+      })
+    })
+
+    test('v-is', () => {
+      const { node, root } = parseWithBind(`<div v-is="'foo'" />`)
+      expect(root.helpers).toContain(RESOLVE_DYNAMIC_COMPONENT)
+      expect(node).toMatchObject({
+        tag: {
+          callee: RESOLVE_DYNAMIC_COMPONENT,
+          arguments: [
+            {
+              type: NodeTypes.SIMPLE_EXPRESSION,
+              content: `'foo'`,
+              isStatic: false
+            }
+          ]
+        },
+        // should skip v-is runtime check
+        directives: undefined
       })
     })
   })
